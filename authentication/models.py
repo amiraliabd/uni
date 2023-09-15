@@ -7,6 +7,39 @@ User.add_to_class('national_id', models.CharField(
 ))
 
 
+User.add_to_class('has_safe_pass', models.BooleanField(
+    blank=False, null=False, default=False
+))
+
+
+User.add_to_class('linkedin', models.URLField(
+    max_length=120, null=True, blank=True
+))
+
+
+User.add_to_class('website', models.URLField(
+    max_length=120, null=True, blank=True
+))
+
+
+User.add_to_class('telegram', models.URLField(
+    max_length=120, null=True, blank=True
+))
+
+
+User.add_to_class('description', models.CharField(
+    max_length=120, null=True, blank=True
+))
+
+
+User.add_to_class('biography', models.TextField(null=True, blank=True))
+
+
+User.add_to_class('father_name', models.CharField(
+    max_length=25, null=False
+))
+
+
 def display_student_sections(self):
     return ', '.join(ss.__str__() for ss in self.student_sections.filter(
         is_active=True
@@ -35,10 +68,3 @@ def display_teaching_sections(self):
 
 User.add_to_class('display_teaching_sections', display_teaching_sections)
 User.add_to_class('display_teaching_sections.short_description', 'Teaching Sections')
-
-
-class GolestanUser(models.Model):
-    student_number = models.CharField(max_length=9, null=False, blank=False, unique=True)
-    national_id = models.CharField(max_length=10, null=False, blank=False, unique=True)
-    first_name = models.CharField(max_length=25)
-    last_name = models.CharField(max_length=25)

@@ -13,7 +13,7 @@ urlpatterns = [
 ]
 
 router = DefaultRouter()
-router.register(r'users', UserView, basename='users')
+router.register(r'profile', UserView, basename='profile')
 router.register(r'change_pass', UserChangePassView, basename='change_pass')
 
 urlpatterns += router.urls

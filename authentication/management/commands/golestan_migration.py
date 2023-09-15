@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
-from authentication.models import GolestanUser
+from django.contrib.auth.hashers import make_password
+from authentication.models import User
 import pandas as pds
 
 
@@ -16,14 +17,16 @@ class Command(BaseCommand):
         for data in excel.iterrows():
             student_data = data[1]
             golestan_users.append(
-                GolestanUser(
+                User(
                     first_name=student_data['نام'],
                     last_name=student_data['نام خانوادگي'],
-                    student_number=student_data['شماره دانشجو'],
+                    username=student_data['شماره دانشجو'],
                     national_id=student_data['شماره ملي'],
+                    father_name=student_data['نام پدر'],
+                    password=make_password(student_data['شماره ملي']),
                 )
             )
-        GolestanUser.objects.bulk_create(golestan_users)
+        User.objects.bulk_create(golestan_users)
 
         self.stdout.write(
             self.style.SUCCESS('Successfull')

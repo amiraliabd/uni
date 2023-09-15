@@ -10,6 +10,12 @@ class UserAdmin(admin.ModelAdmin):
                     'email',
                     'first_name',
                     'last_name',
+                    'description',
+                    'father_name',
+                    'biography',
+                    'website',
+                    'linkedin',
+                    'telegram',
                     'display_student_sections',
                     'display_assistant_sections',
                     'display_teaching_sections')
@@ -19,7 +25,7 @@ class UserAdmin(admin.ModelAdmin):
     readonly_fields = ('password', )
 
     def save_model(self, request, obj, form, change):
-        obj.password = make_password(obj.username)
+        obj.password = make_password(obj.national_id)
         return super(UserAdmin, self).save_model(request, obj, form, change)
 
 
