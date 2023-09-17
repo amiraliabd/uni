@@ -8,9 +8,8 @@ from .models import (
 from authentication.serializers import UserSerializer
 
 
-class UserSectionSerializer(serializers.ModelSerializer):
+class SectionSerializer(serializers.ModelSerializer):
     teacher = UserSerializer(read_only=True)
-    students = UserSerializer(read_only=True, many=True)
     assistants = UserSerializer(read_only=True, many=True)
 
     class Meta:

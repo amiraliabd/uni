@@ -1,14 +1,13 @@
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from .serializers import (
-    UserSectionSerializer,
+    SectionSerializer,
     QuestionSerializer,
-    AnswerSerializer,
     SectionAnswerSerializer,
-GiveAnswerSerializer
+    GiveAnswerSerializer
 )
 from .models import (
     Section,
@@ -17,10 +16,53 @@ from .models import (
 )
 
 
+class BaseSectionView(mixins.ListModelMixin,
+                      GenericViewSet):
+    serializer_class = SectionSerializer
+    permission_classes = [IsAuthenticated, ]
+
+    def _get_base_query(self):
+        raise NotImplementedError
+
+    def get_queryset(self):
+        if qp := self.request.GET.get('is_active', None):
+            if qp == 'true':
+                is_active = True
+            else:
+                is_active = False
+            return self._get_base_query.filter(is_active=is_active).all()
+
+        return self._get_base_query.all()
+
+    def list(self, request, *args, **kwargs):
+        if qp := self.request.GET.get('is_active', None):
+            if qp not in ['true', 'false']:
+                return Response(
+                    status=status.HTTP_400_BAD_REQUEST,
+                    data='is_active query param must be true or false'
+                )
+        return super().list(request, *args, **kwargs)
+
+
+class StudyingSectionView(BaseSectionView):
+    def _get_base_query(self):
+        return self.request.user.student_sections
+
+
+class AssistingSectionView(BaseSectionView):
+    def _get_base_query(self):
+        return self.request.user.assistant_sections
+
+
+class TeachingSectionView(BaseSectionView):
+    def _get_base_query(self):
+        return self.request.user.teaching_sections
+
+
 class SectionView(mixins.RetrieveModelMixin,
                   mixins.ListModelMixin,
                   GenericViewSet):
-    serializer_class = UserSectionSerializer
+    serializer_class = SectionSerializer
     permission_classes = [IsAuthenticated, ]
 
     def get_queryset(self):
@@ -37,7 +79,8 @@ class SectionView(mixins.RetrieveModelMixin,
             id=pk
         ).first()
         if not user_section:
-            return Response('you are not registered in this section', status=status.HTTP_400_BAD_REQUEST)
+            return Response('you are not registered in this section',
+                            status=status.HTTP_400_BAD_REQUEST)
         answered_eval = Answer.objects.filter(
             student__id=self.request.user.id,
             section__id=user_section.id
@@ -47,7 +90,8 @@ class SectionView(mixins.RetrieveModelMixin,
         ).exclude(
             question__id__in=[i.question.id for i in answered_eval]
         )
-        serializer = self.serializer_class([i.question for i in user_pending_eval], many=True)
+        serializer = self.serializer_class([i.question for i in user_pending_eval],
+                                           many=True)
         return Response(serializer.data)
 
     @action(detail=True,
@@ -56,7 +100,8 @@ class SectionView(mixins.RetrieveModelMixin,
             )
     def answer(self, request, pk=None):
         request.data['student'] = request.user.id
-        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer = self.serializer_class(data=request.data,
+                                           context={'request': request})
         if serializer.is_valid():
             serializer.create(serializer.validated_data)
             return Response('answer submitted')
@@ -76,7 +121,7 @@ class SectionView(mixins.RetrieveModelMixin,
 
 class PendingEvalView(mixins.ListModelMixin,
                       GenericViewSet):
-    serializer_class = UserSectionSerializer
+    serializer_class = SectionSerializer
     permission_classes = [IsAuthenticated, ]
 
     def get_queryset(self):
