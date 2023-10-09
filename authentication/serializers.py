@@ -23,6 +23,8 @@ class UserSerializer(serializers.ModelSerializer):
                   'linkedin',
                   'telegram',
                   'has_safe_pass',
+                  'entering_year',
+                  'field',
                   ]
         read_only_fields = ['username', 'id', 'has_safe_pass']
 

@@ -40,6 +40,16 @@ User.add_to_class('father_name', models.CharField(
 ))
 
 
+User.add_to_class('field', models.CharField(
+    max_length=120, null=True
+))
+
+
+User.add_to_class('entering_year', models.IntegerField(
+    null=True
+))
+
+
 def display_student_sections(self):
     return ', '.join(ss.__str__() for ss in self.student_sections.filter(
         is_active=True

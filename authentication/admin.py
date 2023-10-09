@@ -16,6 +16,8 @@ class UserAdmin(admin.ModelAdmin):
                     'website',
                     'linkedin',
                     'telegram',
+                    'entering_year',
+                    'field',
                     'display_student_sections',
                     'display_assistant_sections',
                     'display_teaching_sections')
