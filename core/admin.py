@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     Section,
     Question,
-    PendingEvaluation,
+    Evaluation,
+    Answer,
 )
 
 
@@ -14,6 +15,11 @@ class StudentSectionInline(admin.TabularInline):
 class AssistantSectionInline(admin.TabularInline):
     model = Section.assistants.through
     verbose_name = 'Section Assistant'
+
+
+class EvaluationQuestionInline(admin.TabularInline):
+    model = Evaluation.questions.through
+    verbose_name = 'Evaluation Questions'
 
 
 class SectionAdmin(admin.ModelAdmin):
@@ -33,16 +39,23 @@ class SectionAdmin(admin.ModelAdmin):
 
 
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'question', 'comment')
+    list_display = ('question',)
     search_fields = ('question', )
-    list_filter = ('comment', )
 
 
-class PendingEvalAdmin(admin.ModelAdmin):
-    list_display = ('question', 'section')
-    search_fields = ('question', 'section')
+class EvalAdmin(admin.ModelAdmin):
+    list_display = ('title', 'section', 'deadline')
+    search_fields = ('section', )
+    inlines = [EvaluationQuestionInline, ]
+    exclude = ['questions']
+
+
+class AnswerAdmin(admin.ModelAdmin):
+    list_display = ('evaluation', 'question', 'answer')
+    exclude = ['student', ]
 
 
 admin.site.register(Section, SectionAdmin)
 admin.site.register(Question, QuestionAdmin)
-admin.site.register(PendingEvaluation, PendingEvalAdmin)
+admin.site.register(Evaluation, EvalAdmin)
+admin.site.register(Answer, AnswerAdmin)

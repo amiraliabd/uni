@@ -37,25 +37,24 @@ class Section(models.Model):
 
 class Question(models.Model):
     question = models.CharField(max_length=200)
-    comment = models.BooleanField(default=False)
 
     def __str__(self):
         return self.question
 
 
-class PendingEvaluation(models.Model):
+class Evaluation(models.Model):
+    title = models.CharField(max_length=100)
     section = models.ForeignKey(Section,
                                 on_delete=models.CASCADE,
                                 related_name='pending_eval')
-    question = models.ForeignKey(Question,
-                                 on_delete=models.CASCADE,
-                                 related_name='pending_eval')
+    questions = models.ManyToManyField(Question)
+    deadline = models.DateTimeField()
 
     class Meta:
-        unique_together = ("section", "question")
+        unique_together = ("section", 'deadline')
 
     def __str__(self):
-        return self.question.__str__()
+        return self.title.__str__()
 
 
 class Answer(models.Model):
@@ -63,16 +62,15 @@ class Answer(models.Model):
                                  on_delete=models.CASCADE,
                                  related_name='answers')
 
-    section = models.ForeignKey(Section,
-                                on_delete=models.CASCADE,
-                                related_name='evals')
+    evaluation = models.ForeignKey(Evaluation,
+                                   on_delete=models.PROTECT,
+                                   related_name='answers')
 
     student = models.ForeignKey(User,
                                 on_delete=models.CASCADE,
                                 related_name='answers')
 
     answer = models.PositiveIntegerField(null=True, blank=True)
-    comment = models.CharField(max_length=120, null=True, blank=True)
 
     class Meta:
-        unique_together = ("section", "student", "question")
+        unique_together = ("evaluation", "student", "question")

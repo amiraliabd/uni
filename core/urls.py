@@ -1,20 +1,24 @@
-from rest_framework.routers import DefaultRouter
+from rest_framework_nested import routers
 from .views import (
     SectionView,
-    PendingEvalView,
-    StudyingSectionView,
-    TeachingSectionView,
-    AssistingSectionView,
+    SectionEvalView,
+    EvalAnswerView,
 )
+from django.urls import path, include
 
 
-urlpatterns = []
+router = routers.SimpleRouter()
+router.register(r'sections', SectionView, basename='sections')
 
-router = DefaultRouter()
-# router.register(r'sections', SectionView, basename='sections')
-router.register(r'teaching-sections', TeachingSectionView, basename='teaching-sections')
-router.register(r'assisting-sections', AssistingSectionView, basename='assisting-sections')
-router.register(r'studying-sections', StudyingSectionView, basename='studying-sections')
-# router.register(r'pending_eval_sections', PendingEvalView, basename='pending_eval_sections')
+eval_router = routers.NestedSimpleRouter(router, r'sections', lookup='section')
+eval_router.register(r'evaluations', SectionEvalView, basename='section-evaluations')
 
-urlpatterns += router.urls
+answer_router = routers.NestedSimpleRouter(eval_router, r'evaluations', lookup='evaluation')
+answer_router.register(r'answers', EvalAnswerView, basename='evaluation-answers')
+
+
+urlpatterns = [
+    path(r'', include(router.urls)),
+    path(r'', include(eval_router.urls)),
+    path(r'', include(answer_router.urls)),
+]

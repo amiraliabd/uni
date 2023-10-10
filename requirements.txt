@@ -10,6 +10,7 @@ Django==4.2
 django-cors-headers==4.1.0
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.2.2
+drf-nested-routers==0.93.4
 drf-yasg==1.21.7
 et-xmlfile==1.1.0
 fonttools==4.40.0

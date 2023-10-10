@@ -1,145 +1,109 @@
+from datetime import datetime
+
+from django.utils.timezone import make_aware, get_default_timezone
+
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import mixins, status
-from rest_framework.decorators import action
+from rest_framework import mixins
+from rest_framework.serializers import ValidationError
+from rest_framework import response, status
+
 from .serializers import (
     SectionSerializer,
-    QuestionSerializer,
-    SectionAnswerSerializer,
-    GiveAnswerSerializer
+    EvaluationListSerializer,
+    EvaluationReportSerializer,
+    EvaluationDetailSerializer,
+    AnswerSerializer,
 )
 from .models import (
-    Section,
-    PendingEvaluation,
-    Answer,
+    Evaluation,
 )
+from .exceptions import HttpNotAllowed
 
 
-class BaseSectionView(mixins.ListModelMixin,
-                      GenericViewSet):
+class SectionView(mixins.ListModelMixin,
+                  mixins.RetrieveModelMixin,
+                  GenericViewSet):
     serializer_class = SectionSerializer
     permission_classes = [IsAuthenticated, ]
 
     def _get_base_query(self):
-        raise NotImplementedError
+        user = self.request.user
+        if self.action == 'list':
+            if qp := self.request.GET.get('role'):
+                if qp == 'teacher':
+                    return user.teaching_sections
+                elif qp == 'assistant':
+                    return user.assistant_sections
+                elif qp == 'student':
+                    return user.student_sections
+                else:
+                    raise ValidationError({"role": "only teacher or assistant or student"})
+
+        return user.student_sections.union(user.teaching_sections.all()).union(user.assistant_sections.all())
 
     def get_queryset(self):
         if qp := self.request.GET.get('is_active', None):
             if qp == 'true':
                 is_active = True
-            else:
+            elif qp == 'false':
                 is_active = False
+            else:
+                raise ValidationError({"is_active": "only true or false"})
             return self._get_base_query.filter(is_active=is_active).all()
 
-        return self._get_base_query.all()
-
-    def list(self, request, *args, **kwargs):
-        if qp := self.request.GET.get('is_active', None):
-            if qp not in ['true', 'false']:
-                return Response(
-                    status=status.HTTP_400_BAD_REQUEST,
-                    data='is_active query param must be true or false'
-                )
-        return super().list(request, *args, **kwargs)
+        return self._get_base_query().all()
 
 
-class StudyingSectionView(BaseSectionView):
-    def _get_base_query(self):
-        return self.request.user.student_sections
-
-
-class AssistingSectionView(BaseSectionView):
-    def _get_base_query(self):
-        return self.request.user.assistant_sections
-
-
-class TeachingSectionView(BaseSectionView):
-    def _get_base_query(self):
-        return self.request.user.teaching_sections
-
-
-class SectionView(mixins.RetrieveModelMixin,
-                  mixins.ListModelMixin,
-                  GenericViewSet):
-    serializer_class = SectionSerializer
-    permission_classes = [IsAuthenticated, ]
-
-    def get_queryset(self):
-        user = self.request.user
-        return user.student_sections
-
-    @action(detail=True,
-            methods=['get', ],
-            serializer_class=QuestionSerializer,
-            )
-    def evaluate(self, request, pk=None):
-        user_section = Section.objects.filter(
-            students__id=self.request.user.id,
-            id=pk
-        ).first()
-        if not user_section:
-            return Response('you are not registered in this section',
-                            status=status.HTTP_400_BAD_REQUEST)
-        answered_eval = Answer.objects.filter(
-            student__id=self.request.user.id,
-            section__id=user_section.id
-        ).all()
-        user_pending_eval = PendingEvaluation.objects.filter(
-            section__id=user_section.id
-        ).exclude(
-            question__id__in=[i.question.id for i in answered_eval]
-        )
-        serializer = self.serializer_class([i.question for i in user_pending_eval],
-                                           many=True)
-        return Response(serializer.data)
-
-    @action(detail=True,
-            methods=['post', ],
-            serializer_class=GiveAnswerSerializer,
-            )
-    def answer(self, request, pk=None):
-        request.data['student'] = request.user.id
-        serializer = self.serializer_class(data=request.data,
-                                           context={'request': request})
-        if serializer.is_valid():
-            serializer.create(serializer.validated_data)
-            return Response('answer submitted')
-        else:
-            print(serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True,
-            methods=['get', ],
-            )
-    def evaluation_responses(self, request, pk=None):
-        section = self.get_object()
-        section_eval = section.evals.all().order_by('question')
-        serializer = SectionAnswerSerializer(section_eval, many=True)
-        return Response(serializer.data)
-
-
-class PendingEvalView(mixins.ListModelMixin,
+class SectionEvalView(mixins.RetrieveModelMixin,
+                      mixins.ListModelMixin,
                       GenericViewSet):
-    serializer_class = SectionSerializer
     permission_classes = [IsAuthenticated, ]
 
     def get_queryset(self):
-        user_sections = Section.objects.filter(students__id=self.request.user).all()
-        pending_eval = PendingEvaluation.objects.filter(
-            section__in=[i.id for i in user_sections]
-        ).all()
-        answered_eval = Answer.objects.filter(
-            student__id=2,
-            section__id__in=[i.id for i in pending_eval]
-        ).all()
-        user_pending_eval = PendingEvaluation.objects.filter(
-            section__in=[i.id for i in user_sections]
-        ).exclude(
-            id__in=[i.id for i in answered_eval]
-        ).all()
-        user_section_pending_eval = Section.objects.filter(
-            id__in=[i.section.id for i in user_pending_eval]
-        )
+        return Evaluation.objects.filter(section__id=self.kwargs['section_pk']).all()
 
-        return user_section_pending_eval
+    def get_object(self):
+        obj = super(SectionEvalView, self).get_object()
+
+        answered_questions = self.request.user.answers.filter(evaluation__id=obj.id).all()
+
+        # if all questions are not answered let user answer again
+        if len(answered_questions) < len(obj.questions.all()):
+            return obj
+        else:
+            # user must wait till evaluation report is ready
+            raise HttpNotAllowed('you should waite till deadline to get evaluation report')
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EvaluationListSerializer
+        else:
+            evaluation = self.get_object()
+            if evaluation.deadline < make_aware(datetime.now(), get_default_timezone()):
+                return EvaluationReportSerializer
+            else:
+                if evaluation.section.id in [s.id for s in self.request.user.student_sections.all()]:
+                    return EvaluationDetailSerializer
+                else:
+                    # user is teacher or assistant so must wait till evaluation report is ready
+                    raise HttpNotAllowed('you should waite till deadline to get evaluation report')
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            response = super(SectionEvalView, self).retrieve(request, *args, **kwargs)
+        except HttpNotAllowed as err:
+            return err.http_response
+        return response
+
+
+class EvalAnswerView(GenericViewSet):
+
+    permission_classes = [IsAuthenticated, ]
+    serializer_class = AnswerSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.create(serializer.data)
+        return response.Response(status=status.HTTP_201_CREATED)
